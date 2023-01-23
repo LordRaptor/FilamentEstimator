@@ -17,8 +17,12 @@ import java.util.TreeMap;
 
 public class Estimator {
     public static void main(String[] args) throws IOException {
-        Path gcodeFile = Paths.get("E:\\My Files\\Projects\\3D Printing\\SP8 Coup Perdu Clock\\Sliced\\Frame",
-                "frame-dial-roman-3-colors_0.2mm_PLA_MK3S_7h34m.gcode");
+        if (args.length != 1) {
+            System.err.println("Usage: Estimator <path to gcode file>");
+            System.exit(1);
+        }
+
+        Path gcodeFile = Paths.get(args[0]);
         List<Line> lines = GCodeParser.parseFile(gcodeFile);
         GcodeFile parsedFile = Estimator.parseLayers(lines);
 
