@@ -117,7 +117,7 @@ public class Estimator {
 
             double totalFilament = 0;
             double runningFilament = 0;
-            int currentColor = 0;
+            int currentColor = 1;
             for (Layer l : gcodeFile.getLayers()) {
                 if (l.getColorNumber() != currentColor) {
                     runningFilament = 0;
