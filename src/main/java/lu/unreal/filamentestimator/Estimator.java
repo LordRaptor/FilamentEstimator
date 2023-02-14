@@ -7,8 +7,10 @@ import lu.unreal.filamentestimator.GCodeParser.Line.Type;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.OptionalDouble;
@@ -22,11 +24,35 @@ public class Estimator {
             System.exit(1);
         }
 
-        Path gcodeFile = Paths.get(args[0]);
-        List<Line> lines = GCodeParser.parseFile(gcodeFile);
-        GcodeFile parsedFile = Estimator.parseLayers(lines);
+        Path inputPath = Paths.get(args[0]);
 
-        printCsvOutput(parsedFile);
+        if (Files.isDirectory(inputPath)) {
+            Files.walk(inputPath)
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".gcode"))
+                    .forEach(p -> {
+                        try {
+                            List<Line> lines = GCodeParser.parseFile(p);
+                            GcodeFile parsedFile = Estimator.parseLayers(lines);
+
+                            System.out.println(p.toAbsolutePath());
+                            printSummaryOutput(parsedFile);
+                            System.out.println();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                    });
+
+        } else {
+            List<Line> lines = GCodeParser.parseFile(inputPath);
+            GcodeFile parsedFile = Estimator.parseLayers(lines);
+
+            System.out.println(inputPath.toAbsolutePath());
+            printSummaryOutput(parsedFile);
+        }
+
+
 
     }
 
@@ -85,6 +111,28 @@ public class Estimator {
             }
         }
         return OptionalDouble.empty();
+    }
+
+    public static void printSummaryOutput(GcodeFile gcodeFile) {
+        StringBuilder sb = new StringBuilder();
+
+        DecimalFormat decimalFormat = new DecimalFormat("0.00");
+        sb.append("Filament Type: ").append(gcodeFile.getFilamentType()).append('\n');
+        sb.append("Filament Diameter: ").append(decimalFormat.format(gcodeFile.getFilamentDiameter())).append("mm").append('\n');
+        sb.append("Filament Density: ").append(decimalFormat.format(gcodeFile.getFilamentDensity())).append("g/cm3").append('\n');
+        sb.append("Total Layer Count: ").append(gcodeFile.getLayers().size()).append('\n');
+
+        SortedMap<Integer, AtomicDouble> totalPerColor = new TreeMap<>();
+        for (Layer l : gcodeFile.getLayers()) {
+            AtomicDouble atomicDouble = totalPerColor.computeIfAbsent(l.getColorNumber(), i -> new AtomicDouble());
+            atomicDouble.addAndGet(l.getFilamentExtruded());
+        }
+        for (Entry<Integer, AtomicDouble> entry : totalPerColor.entrySet()) {
+            double usage = gcodeFile.convertToWeight(entry.getValue().get());
+            sb.append("Color ").append(entry.getKey()).append(": ").append(decimalFormat.format(usage)).append("g\n");
+        }
+
+        System.out.println(sb);
     }
 
     public static void printCsvOutput(GcodeFile gcodeFile) {
